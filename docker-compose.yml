@@ -1,0 +1,62 @@
+#version: "3"
+services:
+  postgres:
+    image: postgres:latest
+    container_name: PostgresSQL
+    ports:
+      - "6500:5432"
+    volumes:
+      - postgres-data:/data
+    env_file:
+      - ./.env
+
+  pgAdmin:
+    image: dpage/pgadmin4
+    container_name: PgAdmin
+    env_file:
+      - ./.env
+    ports:
+      - "5050:80"
+    volumes:
+      - pg-admin:/data
+
+  redis:
+    image: redis:latest
+    container_name: Redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: RedisInsight
+    restart: always
+    ports:
+      - "5540:5540"
+    volumes:
+      - redis-insight:/data
+
+  #server:
+  #  build:
+  #  context: .
+  # dockerfile: Dockerfile
+  #container_name: Server
+  #depends_on:
+  # - redis
+  #- postgres
+  #networks:
+  #  - app-network
+  #ports:
+  # - "8000:8000" # Adjust the port if your application uses a different port
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  redis-insight:
+  pg-admin:
+  postgres-data:

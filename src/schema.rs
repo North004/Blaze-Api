@@ -46,10 +46,10 @@ pub struct CreatePostSchema {
     pub content: String,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct LikePostSchema {
-    pub like: bool,
-}
+//#[derive(Debug, Deserialize)]
+//pub struct LikePostSchema {
+//    pub like: bool,
+//}
 
 #[derive(Debug, Deserialize,Validate)]
 pub struct LikePostSchemaOptional {
@@ -58,10 +58,10 @@ pub struct LikePostSchemaOptional {
 }
 
 
-#[derive(Debug, Deserialize)]
-pub struct CommentSchema {
-    pub content: String,
-}
+//#[derive(Debug, Deserialize)]
+//pub struct CommentSchema {
+//    pub content: String,
+//}
 
 #[derive(Debug, Deserialize,Validate)]
 pub struct CommentSchemaOptional {

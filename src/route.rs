@@ -1,7 +1,10 @@
 use crate::{
-    handlers::{
-        comment, create_post, delete_post, get_all_posts, get_all_users, get_comments, get_post, get_profile, is_logged_in, login_user_handler, logout_handler, react_to_post, register_user_handler
-    },
+    handlers::{auth_handlers,
+              comment_handlers,
+              post_handlers,
+              profile_handlers,
+              user_handlers},
+
     session_auth::auth,
     AppState,
 };
@@ -15,22 +18,22 @@ use std::sync::Arc;
 pub fn create_router(app_state: Arc<AppState>) -> Router {
     // Define the protected routes
     let protected_routes = Router::new()
-        .route("/posts", post(create_post))
-        .route("/posts/:post_id", delete(delete_post))
-        .route("/posts/:post_id/react", post(react_to_post))
-        .route("/auth/logout", post(logout_handler))
-        .route("/auth/status", post(is_logged_in))
-        .route("/posts/:post_id/comments", post(comment));
+        .route("/posts", post(post_handlers::create_post))
+        .route("/posts/:post_id", delete(post_handlers::delete_post))
+        .route("/posts/:post_id/react", post(post_handlers::react_to_post))
+        .route("/auth/logout", post(auth_handlers::logout_handler))
+        .route("/auth/status", post(auth_handlers::status_handler))
+        .route("/posts/:post_id/comments", post(comment_handlers::create_comment_handler));
 
     // Define the unprotected routes
     let unprotected_routes = Router::new()
-        .route("/user/:username", get(get_profile))
-        .route("/users", get(get_all_users))
-        .route("/posts", get(get_all_posts))
-        .route("/auth/login", post(login_user_handler))
-        .route("/auth/register", post(register_user_handler))
-        .route("/posts/:post_id/comments", get(get_comments))
-        .route("/posts/:post_id", get(get_post));
+        .route("/user/:username", get(profile_handlers::get_profile))
+        .route("/users", get(user_handlers::get_all_users))
+        .route("/posts", get(post_handlers::get_all_posts))
+        .route("/auth/login", post(auth_handlers::login_handler))
+        .route("/auth/register", post(auth_handlers::register_handler))
+        .route("/posts/:post_id/comments", get(comment_handlers::get_comments_handler))
+        .route("/posts/:post_id", get(post_handlers::get_post));
 
 
     // Apply the middleware layer to protected routes

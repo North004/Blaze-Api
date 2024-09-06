@@ -1,7 +1,7 @@
 use crate::{
     model::{PostResponse,UserModel},
     response::{ApiError, AppJson, GeneralResponse, Status},
-    schema::{CreatePostSchema, CreatePostSchemaOptional, LikePostSchemaOptional},
+    schema::{CreatePostSchema, LikePostSchema},
     AppState,
 };
 use axum::{
@@ -10,9 +10,9 @@ use axum::{
     Extension, Json,
 };
 use serde_json::json;
+use validator::Validate;
 use std::sync::Arc;
 use uuid::Uuid;
-use validator::Validate;
 
 pub async fn get_post(
     State(data): State<Arc<AppState>>,
@@ -84,11 +84,10 @@ pub async fn react_to_post(
     State(data): State<Arc<AppState>>,
     Extension(user): Extension<UserModel>,
     Path(postid): Path<String>,
-    AppJson(is_like): AppJson<LikePostSchemaOptional>,
+    AppJson(is_like): AppJson<LikePostSchema>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let post_id = Uuid::parse_str(&postid).map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
     is_like.validate()?;
-    let is_like = is_like.like;
+    let post_id = Uuid::parse_str(&postid).map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
 
     let existing_reaction = sqlx::query!(
         "SELECT id FROM reactions WHERE post_id = $1 AND user_id = $2",
@@ -103,7 +102,7 @@ pub async fn react_to_post(
         // Update the existing reaction
         sqlx::query!(
             "UPDATE reactions SET reaction_type = $1 WHERE id = $2",
-            is_like,
+            is_like.is_like,
             reaction.id
         )
         .execute(&data.db)
@@ -115,7 +114,7 @@ pub async fn react_to_post(
             "INSERT INTO reactions (post_id, user_id,  reaction_type) VALUES ($1, $2, $3)",
             post_id,
             user.id,
-            is_like
+            is_like.is_like
         )
         .execute(&data.db)
         .await
@@ -183,13 +182,9 @@ pub async fn get_all_posts(
 pub async fn create_post(
     Extension(user): Extension<UserModel>,
     State(data): State<Arc<AppState>>,
-    AppJson(post): AppJson<CreatePostSchemaOptional>,
+    AppJson(post): AppJson<CreatePostSchema>,
 ) -> Result<impl IntoResponse, ApiError> {
     post.validate()?;
-    let title = post.title.ok_or(ApiError::InternalServerError)?;
-    let content = post.content.ok_or(ApiError::InternalServerError)?;
-    let post = CreatePostSchema { title, content };
-
     sqlx::query!(
         "INSERT INTO posts (user_id,title,content) VALUES ($1,$2,$3)",
         user.id,

@@ -1,8 +1,7 @@
 use crate::{
     model::{CommentResponse,UserModel},
     response::{ApiError, AppJson, GeneralResponse, Status},
-    schema::
-        CommentSchemaOptional,
+    schema::CommentSchema, 
     AppState,
 };
 use axum::{
@@ -11,9 +10,9 @@ use axum::{
     Extension, Json,
 };
 use serde_json::json;
+use validator::Validate;
 use std::sync::Arc;
 use uuid::Uuid;
-use validator::Validate;
 
 pub async fn get_comments_handler(
     Path(postid): Path<String>,
@@ -54,14 +53,13 @@ pub async fn create_comment_handler(
     State(data): State<Arc<AppState>>,
     Extension(user): Extension<UserModel>,
     Path(postid): Path<String>,
-    AppJson(comment): AppJson<CommentSchemaOptional>,
+    AppJson(comment): AppJson<CommentSchema>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let postid = Uuid::parse_str(&postid).map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
     comment.validate()?;
-    let content = comment.content.unwrap();
+    let postid = Uuid::parse_str(&postid).map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
     sqlx::query!(
         "INSERT INTO comments (content,user_id,post_id) VALUES ($1,$2,$3)",
-        content,
+        comment.content,
         user.id,
         postid
     )

@@ -21,8 +21,7 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
     // Define the protected routes
     let protected_routes = Router::new()
         .route("/posts", post(post_handlers::create_post))
-        .route("/posts/", post(post_handlers::create_post))
-
+        //.route("/posts/", post(post_handlers::create_post))
         .route("/posts/:post_id", delete(post_handlers::delete_post))
         .route("/posts/:post_id/react", post(post_handlers::react_to_post))
         .route("/auth/logout", post(auth_handlers::logout_handler))
@@ -36,13 +35,15 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
         .route("/users/", get(user_handlers::get_all_users))
 
         .route("/posts", get(post_handlers::get_all_posts))
-        .route("/posts/", get(post_handlers::get_all_posts))
+        //.route("/posts/", get(post_handlers::get_all_posts))
 
         .route("/auth/login", post(auth_handlers::login_handler))
         .route("/auth/register", post(auth_handlers::register_handler))
         .route("/posts/:post_id/comments", get(comment_handlers::get_comments_handler))
         .fallback(handle_invalid_path)
-        .route("/posts/:post_id", get(post_handlers::get_post));
+        .route("/posts/:post_id", get(post_handlers::get_post))
+        .route("/posts/", get(post_handlers::get_post));
+
 
 
     // Apply the middleware layer to protected routes

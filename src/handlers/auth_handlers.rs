@@ -1,21 +1,14 @@
 use crate::{
     model::UserModel,
     response::{ApiError, AppJson, GeneralResponse, Status},
-    schema::{
-         LoginUserSchema, LoginUserSchemaOptional,
-        RegisterUserSchema, RegisterUserSchemaOptional,
-    },
+    schema::{LoginUserSchema, RegisterUserSchema},
     AppState,
 };
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
 };
-use axum::{
-    extract::State,
-    response::IntoResponse,
-    Extension, Json,
-};
+use axum::{extract::State, response::IntoResponse, Extension, Json};
 use serde_json::json;
 use std::{collections::HashMap, sync::Arc};
 use tower_sessions::Session;
@@ -25,13 +18,9 @@ use validator::Validate;
 pub async fn login_handler(
     session: Session,
     State(data): State<Arc<AppState>>,
-    AppJson(body): AppJson<LoginUserSchemaOptional>,
+    AppJson(body): AppJson<LoginUserSchema>,
 ) -> Result<impl IntoResponse, ApiError> {
     body.validate()?;
-    let username = body.username.ok_or(ApiError::InternalServerError)?;
-    let password = body.password.ok_or(ApiError::InternalServerError)?;
-    let body = LoginUserSchema { username, password };
-
     let user: UserModel = sqlx::query_as!(
         UserModel,
         "SELECT * FROM users WHERE username = $1",
@@ -83,14 +72,9 @@ pub async fn logout_handler(session: Session) -> Result<impl IntoResponse, ApiEr
 
 pub async fn register_handler(
     State(data): State<Arc<AppState>>,
-    AppJson(body): AppJson<RegisterUserSchemaOptional>,
+    Json(body): Json<RegisterUserSchema>,
 ) -> Result<impl IntoResponse, ApiError> {
     body.validate()?;
-    let username = body.username.ok_or(ApiError::InternalServerError)?;
-    let email = body.email.ok_or(ApiError::InternalServerError)?;
-    let password = body.password.ok_or(ApiError::InternalServerError)?;
-    let body = RegisterUserSchema { username, email, password };
-
     let user_exists: bool = sqlx::query_scalar!(
         "SELECT EXISTS (SELECT 1 FROM users WHERE username = $1)",
         body.username.to_owned()

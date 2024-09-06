@@ -89,11 +89,7 @@ pub async fn register_handler(
     let username = body.username.ok_or(ApiError::InternalServerError)?;
     let email = body.email.ok_or(ApiError::InternalServerError)?;
     let password = body.password.ok_or(ApiError::InternalServerError)?;
-    let body = RegisterUserSchema {
-        username,
-        email,
-        password,
-    };
+    let body = RegisterUserSchema { username, email, password };
 
     let user_exists: bool = sqlx::query_scalar!(
         "SELECT EXISTS (SELECT 1 FROM users WHERE username = $1)",

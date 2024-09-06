@@ -16,8 +16,9 @@ use validator::Validate;
 
 pub async fn get_post(
     State(data): State<Arc<AppState>>,
-    Path(postid): Path<Uuid>,
+    Path(postid): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let postid = Uuid::parse_str(&postid).map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
     let post :PostResponse = sqlx::query_as!(
         PostResponse,
         "SELECT
@@ -54,8 +55,9 @@ pub async fn get_post(
 pub async fn delete_post(
     Extension(user): Extension<UserModel>,
     State(data): State<Arc<AppState>>,
-    Path(post_id): Path<Uuid>,
+    Path(postid): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let post_id = Uuid::parse_str(&postid).map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
     let post_uuid = sqlx::query_scalar!("SELECT user_id FROM posts WHERE id = $1", post_id)
         .fetch_one(&data.db)
         .await
@@ -81,9 +83,10 @@ pub async fn delete_post(
 pub async fn react_to_post(
     State(data): State<Arc<AppState>>,
     Extension(user): Extension<UserModel>,
-    Path(post_id): Path<Uuid>,
+    Path(postid): Path<String>,
     AppJson(is_like): AppJson<LikePostSchemaOptional>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let post_id = Uuid::parse_str(&postid).map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
     is_like.validate()?;
     let is_like = is_like.like;
 

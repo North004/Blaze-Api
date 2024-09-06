@@ -16,9 +16,10 @@ use uuid::Uuid;
 use validator::Validate;
 
 pub async fn get_comments_handler(
-    Path(postid): Path<Uuid>,
+    Path(postid): Path<String>,
     State(data): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let postid = Uuid::parse_str(&postid).map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
     let comments = sqlx::query_as!(
         CommentResponse,
         "SELECT
@@ -52,9 +53,10 @@ pub async fn get_comments_handler(
 pub async fn create_comment_handler(
     State(data): State<Arc<AppState>>,
     Extension(user): Extension<UserModel>,
-    Path(postid): Path<Uuid>,
+    Path(postid): Path<String>,
     AppJson(comment): AppJson<CommentSchemaOptional>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let postid = Uuid::parse_str(&postid).map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
     comment.validate()?;
     let content = comment.content.unwrap();
     sqlx::query!(

@@ -72,7 +72,7 @@ pub async fn logout_handler(session: Session) -> Result<impl IntoResponse, ApiEr
 
 pub async fn register_handler(
     State(data): State<Arc<AppState>>,
-    Json(body): Json<RegisterUserSchema>,
+    AppJson(body): AppJson<RegisterUserSchema>,
 ) -> Result<impl IntoResponse, ApiError> {
     body.validate()?;
     let user_exists: bool = sqlx::query_scalar!(

@@ -1,6 +1,6 @@
 use crate::{
-    model::{PostResponse,UserModel},
-    response::{ApiError, AppJson, GeneralResponse, Status},
+    model::{PostResponse, UserModel},
+    response::{ApiError, AppJson, AppPath, GeneralResponse, Status},
     schema::{CreatePostSchema, LikePostSchema},
     AppState,
 };
@@ -10,15 +10,16 @@ use axum::{
     Extension, Json,
 };
 use serde_json::json;
-use validator::Validate;
 use std::sync::Arc;
 use uuid::Uuid;
+use validator::Validate;
 
 pub async fn get_post(
     State(data): State<Arc<AppState>>,
     Path(postid): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let postid = Uuid::parse_str(&postid).map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
+    let postid = Uuid::parse_str(&postid)
+        .map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
     let post :PostResponse = sqlx::query_as!(
         PostResponse,
         "SELECT
@@ -57,7 +58,8 @@ pub async fn delete_post(
     State(data): State<Arc<AppState>>,
     Path(postid): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let post_id = Uuid::parse_str(&postid).map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
+    let post_id = Uuid::parse_str(&postid)
+        .map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
     let post_uuid = sqlx::query_scalar!("SELECT user_id FROM posts WHERE id = $1", post_id)
         .fetch_one(&data.db)
         .await
@@ -87,7 +89,8 @@ pub async fn react_to_post(
     AppJson(is_like): AppJson<LikePostSchema>,
 ) -> Result<impl IntoResponse, ApiError> {
     is_like.validate()?;
-    let post_id = Uuid::parse_str(&postid).map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
+    let post_id = Uuid::parse_str(&postid)
+        .map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
 
     let existing_reaction = sqlx::query!(
         "SELECT id FROM reactions WHERE post_id = $1 AND user_id = $2",

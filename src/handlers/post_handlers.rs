@@ -16,7 +16,7 @@ use validator::Validate;
 
 pub async fn get_post(
     State(data): State<Arc<AppState>>,
-    Path(postid): Path<String>,
+    AppPath(postid): AppPath<String>,
 ) -> Result<impl IntoResponse, ApiError> {
     let postid = Uuid::parse_str(&postid)
         .map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;

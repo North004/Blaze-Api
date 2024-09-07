@@ -1,14 +1,13 @@
-use axum::async_trait;
+use axum::{async_trait, Json};
 use axum::body::Body;
+use axum::extract::FromRequestParts;
 use axum::extract::{rejection::JsonRejection, FromRequest};
+use axum::http::request::Parts;
 use axum::response::Response;
-use axum::{
-    extract::{path::ErrorKind, rejection::PathRejection, FromRequestParts},
-    http::{request::Parts, StatusCode},
-    response::IntoResponse,
-};
+use axum::{extract::rejection::PathRejection, http::StatusCode, response::IntoResponse};
+use serde::de::DeserializeOwned;
 use serde::Serializer;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -69,6 +68,7 @@ where
     }
 }
 
+
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response<Body> {
         let (value, status) = match self {
@@ -90,7 +90,6 @@ impl IntoResponse for ApiError {
             ApiError::ValidationError(err) => {
                 let mut error_map: HashMap<String, String> = HashMap::new();
 
-                // Populate the error map with field names and their corresponding error messages
                 for (field, errors) in err.field_errors() {
                     let messages: Vec<String> = errors
                         .iter()
@@ -128,102 +127,29 @@ impl IntoResponse for ApiError {
     }
 }
 
-pub struct AppPath<T>(T);
-
-#[async_trait]
-impl<S, T> FromRequestParts<S> for AppPath<T>
-where
-    T: DeserializeOwned + Send,
-    S: Send + Sync,
-{
-    type Rejection = (StatusCode, axum::Json<PathError>);
-
-    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        match axum::extract::Path::<T>::from_request_parts(parts, state).await {
-            Ok(value) => Ok(Self(value.0)),
-            Err(rejection) => {
-                let (status, body) = match rejection {
-                    PathRejection::FailedToDeserializePathParams(inner) => {
-                        let mut status = StatusCode::BAD_REQUEST;
-
-                        let kind = inner.into_kind();
-                        let body = match &kind {
-                            ErrorKind::WrongNumberOfParameters { .. } => PathError {
-                                message: kind.to_string(),
-                                location: None,
-                            },
-
-                            ErrorKind::ParseErrorAtKey { key, .. } => PathError {
-                                message: kind.to_string(),
-                                location: Some(key.clone()),
-                            },
-
-                            ErrorKind::ParseErrorAtIndex { index, .. } => PathError {
-                                message: kind.to_string(),
-                                location: Some(index.to_string()),
-                            },
-
-                            ErrorKind::ParseError { .. } => PathError {
-                                message: kind.to_string(),
-                                location: None,
-                            },
-
-                            ErrorKind::InvalidUtf8InPathParam { key } => PathError {
-                                message: kind.to_string(),
-                                location: Some(key.clone()),
-                            },
-
-                            ErrorKind::UnsupportedType { .. } => {
-                                status = StatusCode::INTERNAL_SERVER_ERROR;
-                                PathError {
-                                    message: kind.to_string(),
-                                    location: None,
-                                }
-                            }
-
-                            ErrorKind::Message(msg) => PathError {
-                                message: msg.clone(),
-                                location: None,
-                            },
-
-                            _ => PathError {
-                                message: format!("Unhandled deserialization error: {kind}"),
-                                location: None,
-                            },
-                        };
-
-                        (status, body)
-                    }
-                    PathRejection::MissingPathParams(error) => (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        PathError {
-                            message: error.to_string(),
-                            location: None,
-                        },
-                    ),
-                    _ => (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        PathError {
-                            message: format!("Unhandled path rejection: {rejection}"),
-                            location: None,
-                        },
-                    ),
-                };
-
-                Err((status, axum::Json(body)))
-            }
-        }
-    }
-}
-
-#[derive(Serialize)]
-pub struct PathError {
-    message: String,
-    location: Option<String>,
-}
-
 impl From<JsonRejection> for ApiError {
     fn from(rejection: JsonRejection) -> Self {
         Self::JsonRejection(rejection)
     }
 }
+
+
+pub struct AppPath<T>(pub T);
+
+#[async_trait]
+impl<S, T> FromRequestParts<S> for AppPath<T>
+where
+    // these trait bounds are copied from `impl FromRequest for axum::extract::path::Path`
+    T: DeserializeOwned + Send,
+    S: Send + Sync,
+{
+    type Rejection = (StatusCode, Json<Value>);
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        match axum::extract::Path::<T>::from_request_parts(parts, state).await {
+            Ok(value) => Ok(Self(value.0)),
+            Err(_rejection) => Err((StatusCode::OK, Json(json!({"status" : "error" , "message" : "path rejection"})))), 
+        }
+    }
+}
+

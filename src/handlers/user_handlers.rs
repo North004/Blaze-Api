@@ -3,7 +3,6 @@ use crate::{
     response::{AppError, JsendResponse},
     AppState,
 };
-
 use axum::{extract::State, response::IntoResponse, Json};
 use serde_json::json;
 use std::sync::Arc;

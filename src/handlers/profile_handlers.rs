@@ -1,16 +1,14 @@
 use crate::{
-    model::ProfileModel,
+    model::{ProfileModel, UserModel},
     response::{AppError, AppPath, JsendResponse},
     AppState,
 };
 use axum::{
-    extract::State,
-    response::IntoResponse,
-    Json,
+    extract::{Multipart, State}, response::IntoResponse, Extension, Json
 };
 use serde_json::json;
 use std::sync::Arc;
-
+use tokio::fs;
 
 pub async fn get_profile(
     AppPath(username): AppPath<String>,
@@ -50,5 +48,28 @@ pub async fn get_profile(
     };
 
     let response = JsendResponse::success(Some(json!({"profile" : profile})));
+    Ok(Json(response))
+}
+
+
+pub async fn upload_profile_pic(Extension(user): Extension<UserModel>,State(data): State<Arc<AppState>>,mut multipart: Multipart, ) -> Result<impl IntoResponse,AppError> {
+    while let Some(field) = multipart.next_field().await.unwrap() {
+        let _name = field.name().unwrap().to_string();
+        let file_name = field.file_name().unwrap().to_string();
+        let _content_type = field.content_type().unwrap().to_string();
+        let bdata = field.bytes().await.unwrap();
+
+        let uuid_string = match user.id {
+            Some(id) => id.to_string(),
+            None => return Err(AppError::InternalServerError)
+        };
+
+        fs::write(format!("./assets/{}-{}",uuid_string,file_name),bdata).await.map_err(|_| AppError::InternalServerError)?;
+        sqlx::query!("UPDATE profiles SET profile_image = $1 WHERE user_id = $2",file_name,user.id).execute(&data.db)
+        .await
+        .map_err(|_| AppError::InternalServerError)?;
+    }
+    
+    let response = JsendResponse::success(None);
     Ok(Json(response))
 }

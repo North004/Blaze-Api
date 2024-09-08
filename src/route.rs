@@ -34,6 +34,10 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
         .route(
             "/posts/:post_id/comments",
             post(comment_handlers::create_comment_handler),
+        )
+        .route(
+            "/profile/upload",
+            post(profile_handlers::upload_profile_pic)
         );
 
     // Define the unprotected routes

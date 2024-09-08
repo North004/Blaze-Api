@@ -1,4 +1,7 @@
-use crate::validation::{validate_email_length,validate_password_length,validate_username_length,validate_title_length,validate_content_length};
+use crate::validation::{
+    validate_content_length, validate_email_length, validate_password_length,
+    validate_title_length, validate_username_length,
+};
 use serde::Deserialize;
 use validator::Validate;
 
@@ -15,8 +18,7 @@ pub struct RegisterUserSchema {
     pub password: String,
 }
 
-
-#[derive(Debug, Deserialize,Validate)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct LoginUserSchema {
     #[serde(default)]
     #[validate(custom(function = "validate_username_length"))]
@@ -26,7 +28,7 @@ pub struct LoginUserSchema {
     pub password: String,
 }
 
-#[derive(Debug, Deserialize,Validate)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct CreatePostSchema {
     #[serde(default)]
     #[validate(custom(function = "validate_title_length"))]
@@ -36,14 +38,14 @@ pub struct CreatePostSchema {
     pub content: String,
 }
 
-#[derive(Debug, Deserialize,Validate)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct CommentSchema {
     #[serde(default)]
     #[validate(custom(function = "validate_content_length"))]
     pub content: String,
 }
 
-#[derive(Debug, Deserialize,Validate)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct LikePostSchema {
     #[serde(default)]
     pub is_like: bool,

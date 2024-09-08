@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use sqlx::FromRow;
+use uuid::Uuid;
 
 #[derive(Debug, Deserialize, FromRow, Serialize, Clone)]
 pub struct UserModel {
@@ -14,8 +14,7 @@ pub struct UserModel {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
-
-#[derive(Debug, Deserialize,FromRow, Serialize, Clone)]
+#[derive(Debug, Deserialize, FromRow, Serialize, Clone)]
 pub struct ProfileModel {
     pub id: Option<Uuid>,
     pub user_id: Uuid,
@@ -54,8 +53,6 @@ pub struct ReactionModel {
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
 }
-
-
 
 //#[derive(Debug, Deserialize, sqlx::FromRow, Serialize, Clone)]
 //pub struct AlterdPost {
@@ -122,4 +119,11 @@ pub struct UserResponse {
     pub email: String,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ProfileResponse {
+    pub profile_id: Option<Uuid>,
+    pub username: String,
+    pub profile_image: String,
 }

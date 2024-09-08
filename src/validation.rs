@@ -69,7 +69,7 @@ fn validate_length(
     max_err: &'static str,
     empty_err: &'static str,
 ) -> Result<(), ValidationError> {
-    if len == 0 {
+    if len == 0 || len == 1 {
         let error = ValidationError {
             code: Cow::Borrowed(empty_err),
             message: Some(Cow::Borrowed(empty_err)),

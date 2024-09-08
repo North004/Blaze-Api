@@ -10,10 +10,8 @@ CREATE TABLE users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
-
 CREATE INDEX user_username_idx ON users (username);
 CREATE INDEX user_email_idx ON users (email);
-
 
 CREATE TABLE profiles (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

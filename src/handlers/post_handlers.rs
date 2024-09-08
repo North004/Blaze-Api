@@ -4,11 +4,7 @@ use crate::{
     schema::{CreatePostSchema, LikePostSchema},
     AppState,
 };
-use axum::{
-    extract::State,
-    response::IntoResponse,
-    Extension, Json,
-};
+use axum::{extract::State, response::IntoResponse, Extension, Json};
 use serde_json::json;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -61,14 +57,20 @@ pub async fn delete_post(
         .fetch_optional(&data.db)
         .await
         .map_err(|_| AppError::InternalServerError)?;
-    
-    let post_uuid =  match post_uuid {
+
+    let post_uuid = match post_uuid {
         Some(val) => val,
-        None => return Err(AppError::JsendFail(json!({"data" : { "post" : "post does not exist"}}))),
+        None => {
+            return Err(AppError::JsendFail(
+                json!({"data" : { "post" : "post does not exist"}}),
+            ))
+        }
     };
-    
+
     if user.id != Some(post_uuid) {
-        return Err(AppError::JsendFail(json!({"authorization" : "user not authorized to delete this"})));
+        return Err(AppError::JsendFail(
+            json!({"authorization" : "user not authorized to delete this"}),
+        ));
     }
     sqlx::query!("DELETE FROM posts WHERE id = $1", post_id)
         .execute(&data.db)
@@ -135,10 +137,10 @@ pub async fn react_to_post(
     .map_err(|_| AppError::InternalServerError)?;
 
     let response = JsendResponse::success(Some(json!({
-        "post_id": post_id,
-        "like_count" : counts.likes,
-        "dislike_count" : counts.dislikes,
-})));
+            "post_id": post_id,
+            "like_count" : counts.likes,
+            "dislike_count" : counts.dislikes,
+    })));
     Ok(Json(response))
 }
 
@@ -190,7 +192,7 @@ pub async fn create_post(
     .await
     .map_err(|_| AppError::InternalServerError)?;
 
-    let response =  JsendResponse::success(None);
+    let response = JsendResponse::success(None);
 
     Ok(Json(response))
 }

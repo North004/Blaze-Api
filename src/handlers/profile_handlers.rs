@@ -1,10 +1,10 @@
 use crate::{
     model::ProfileModel,
-    response::{ApiError, GeneralResponse, Status},
+    response::{AppError, AppPath, JsendResponse},
     AppState,
 };
 use axum::{
-    extract::{Path, State},
+    extract::State,
     response::IntoResponse,
     Json,
 };
@@ -13,21 +13,21 @@ use std::sync::Arc;
 
 
 pub async fn get_profile(
-    Path(username): Path<String>,
+    AppPath(username): AppPath<String>,
     State(data): State<Arc<AppState>>,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<impl IntoResponse, AppError> {
     // Query to find the user by username
     let user_id: Option<uuid::Uuid> =
         sqlx::query_scalar!("SELECT id FROM users WHERE username = $1", username)
             .fetch_optional(&data.db)
             .await
-            .map_err(|_| ApiError::InternalServerError)?;
+            .map_err(|_| AppError::InternalServerError)?;
 
     // If user is not found, return 404 Not Found
     let user_id = match user_id {
         Some(id) => id,
         _ => {
-            return Err(ApiError::FailMsg("User not found".to_string()));
+            return Err(AppError::JsendError("User not found".to_string()));
         }
     };
 
@@ -39,19 +39,16 @@ pub async fn get_profile(
     )
     .fetch_optional(&data.db)
     .await
-    .map_err(|_| ApiError::InternalServerError)?;
+    .map_err(|_| AppError::InternalServerError)?;
 
     // If profile is not found, return 404 Not Found
     let profile = match profile {
         Some(profile) => profile,
         None => {
-            return Err(ApiError::FailMsg("Profile not found".to_string()));
+            return Err(AppError::JsendFail(json!({"profile" : "profile not found"})));
         }
     };
 
-    let response: GeneralResponse = GeneralResponse {
-        status: Status::Success,
-        data: Some(json!(profile)),
-    };
+    let response = JsendResponse::success(Some(json!({"profile" : profile})));
     Ok(Json(response))
 }

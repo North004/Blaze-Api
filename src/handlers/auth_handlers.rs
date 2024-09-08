@@ -1,6 +1,6 @@
 use crate::{
     model::UserModel,
-    response::{ApiError, AppJson, GeneralResponse, Status},
+    response::{AppError, AppJson, JsendResponse},
     schema::{LoginUserSchema, RegisterUserSchema},
     AppState,
 };
@@ -19,7 +19,7 @@ pub async fn login_handler(
     session: Session,
     State(data): State<Arc<AppState>>,
     AppJson(body): AppJson<LoginUserSchema>,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<impl IntoResponse, AppError> {
     body.validate()?;
     let user: UserModel = sqlx::query_as!(
         UserModel,
@@ -28,8 +28,8 @@ pub async fn login_handler(
     )
     .fetch_optional(&data.db)
     .await
-    .map_err(|_| ApiError::InternalServerError)?
-    .ok_or_else(|| ApiError::Fail(json!({"username" : "user does not exist"})))?;
+    .map_err(|_| AppError::InternalServerError)?
+    .ok_or_else(|| AppError::JsendFail(json!({"username" : "user does not exist"})))?;
 
     let is_valid = match PasswordHash::new(&user.password) {
         Ok(parsed_hash) => Argon2::default()
@@ -39,7 +39,7 @@ pub async fn login_handler(
     };
 
     if !is_valid {
-        return Err(ApiError::Fail(
+        return Err(AppError::JsendFail(
             json!({"password" : "password is incorrect"}),
         ));
     }
@@ -47,33 +47,27 @@ pub async fn login_handler(
     session
         .insert("user_id", user.id)
         .await
-        .map_err(|_| ApiError::InternalServerError)?;
+        .map_err(|_| AppError::InternalServerError)?;
 
-    let response = GeneralResponse {
-        status: Status::Success,
-        data: Some(json!({
-            "username" : body.username
-        })),
-    };
+    let response = JsendResponse::success(Some(json!({
+        "username" : body.username
+    })));
     Ok(Json(response))
 }
 
-pub async fn logout_handler(session: Session) -> Result<impl IntoResponse, ApiError> {
+pub async fn logout_handler(session: Session) -> Result<impl IntoResponse, AppError> {
     session
         .delete()
         .await
-        .map_err(|_| ApiError::InternalServerError)?;
-    let response: GeneralResponse = GeneralResponse {
-        status: Status::Success,
-        data: None,
-    };
+        .map_err(|_| AppError::InternalServerError)?;
+    let response: JsendResponse = JsendResponse::success(None);
     Ok(Json(response))
 }
 
 pub async fn register_handler(
     State(data): State<Arc<AppState>>,
     AppJson(body): AppJson<RegisterUserSchema>,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<impl IntoResponse, AppError> {
     body.validate()?;
     let user_exists: bool = sqlx::query_scalar!(
         "SELECT EXISTS (SELECT 1 FROM users WHERE username = $1)",
@@ -81,7 +75,7 @@ pub async fn register_handler(
     )
     .fetch_one(&data.db)
     .await
-    .map_err(|_| ApiError::InternalServerError)?
+    .map_err(|_| AppError::InternalServerError)?
     .unwrap_or(false);
 
     let email_exists: bool = sqlx::query_scalar!(
@@ -90,7 +84,7 @@ pub async fn register_handler(
     )
     .fetch_one(&data.db)
     .await
-    .map_err(|_| ApiError::InternalServerError)?
+    .map_err(|_| AppError::InternalServerError)?
     .unwrap_or(false);
 
     let mut fails: HashMap<String, String> = HashMap::new();
@@ -104,20 +98,20 @@ pub async fn register_handler(
         fails.insert("email".to_string(), "email already exists".to_string());
     }
     if !fails.is_empty() {
-        return Err(ApiError::Fail(json!(fails)));
+        return Err(AppError::JsendFail(json!(fails)));
     }
 
     let salt = SaltString::generate(&mut OsRng);
     let hashed_password = Argon2::default()
         .hash_password(body.password.as_bytes(), &salt)
-        .map_err(|_| ApiError::InternalServerError)
+        .map_err(|_| AppError::InternalServerError)
         .map(|hash| hash.to_string())?;
 
     let tx = data
         .db
         .begin()
         .await
-        .map_err(|_| ApiError::InternalServerError)?;
+        .map_err(|_| AppError::InternalServerError)?;
 
     let user_id: Uuid = sqlx::query_scalar!(
         "INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING id",
@@ -127,7 +121,7 @@ pub async fn register_handler(
     )
     .fetch_one(&data.db)
     .await
-    .map_err(|_| ApiError::InternalServerError)?;
+    .map_err(|_| AppError::InternalServerError)?;
 
     sqlx::query!("INSERT INTO profiles (user_id, profile_image, bio) VALUES ($1, $2, $3) RETURNING id, user_id,profile_image,bio,created_at,updated_at",
         user_id,
@@ -135,28 +129,22 @@ pub async fn register_handler(
         "".to_string(),
     )
     .fetch_one(&data.db)
-    .await.map_err(|_| { ApiError::InternalServerError})?;
+    .await.map_err(|_| { AppError::InternalServerError})?;
 
     tx.commit()
         .await
-        .map_err(|_| ApiError::InternalServerError)?;
+        .map_err(|_| AppError::InternalServerError)?;
 
-    let response: GeneralResponse = GeneralResponse {
-        status: Status::Success,
-        data: None,
-    };
+    let response: JsendResponse = JsendResponse::success(None);
     Ok(Json(response))
 }
 
 pub async fn status_handler(
     Extension(user): Extension<UserModel>,
-) -> Result<impl IntoResponse, ApiError> {
-    let response: GeneralResponse = GeneralResponse {
-        status: Status::Success,
-        data: Some(json!({
-            "is_logged_in": true,
-            "username" : user.username,
-        })),
-    };
+) -> Result<impl IntoResponse, AppError> {
+    let response: JsendResponse = JsendResponse::success(Some(json!({
+        "is_logged_in": true,
+        "username" : user.username,
+    })));
     Ok(Json(response))
 }

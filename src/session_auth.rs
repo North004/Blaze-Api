@@ -1,5 +1,4 @@
-use crate::model::UserModel;
-use crate::response::ApiError;
+use crate::{model::UserModel, response::AppError};
 use crate::AppState;
 use axum::{
     body::Body,
@@ -17,23 +16,23 @@ pub async fn auth(
     State(data): State<Arc<AppState>>,
     mut req: Request<Body>,
     next: Next,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<impl IntoResponse, AppError> {
     if let Some(user_id) = session
         .get::<Uuid>("user_id")
         .await
-        .map_err(|_| ApiError::InternalServerError)?
+        .map_err(|_| AppError::InternalServerError)?
     {
         let user = sqlx::query_as!(UserModel, "SELECT * FROM users WHERE id = $1", user_id)
             .fetch_optional(&data.db)
             .await
-            .map_err(|_| ApiError::InternalServerError)?;
+            .map_err(|_| AppError::InternalServerError)?;
 
         let user =
-            user.ok_or_else(|| ApiError::Fail(json!({"authentication".to_string() : "user is not authenticated".to_string()})))?;
+            user.ok_or_else(|| AppError::JsendFail(json!({"authentication".to_string() : "user is not authenticated".to_string()})))?;
 
         req.extensions_mut().insert(user);
         Ok(next.run(req).await)
     } else {
-        Err(ApiError::Fail(json!( {"authentication".to_string() : "user is not authenticated".to_string()} )))
+        Err(AppError::JsendFail(json!( {"authentication".to_string() : "user is not authenticated".to_string()} )))
     }
 }

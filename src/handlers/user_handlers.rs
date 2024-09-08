@@ -1,6 +1,6 @@
 use crate::{
-    model::UserModel,
-    response::{ApiError,GeneralResponse, Status},
+    model::UserResponse,
+    response::{AppError,JsendResponse},
     AppState,
 };
 
@@ -14,16 +14,12 @@ use std::sync::Arc;
 
 pub async fn get_all_users(
     State(data): State<Arc<AppState>>,
-) -> Result<impl IntoResponse, ApiError> {
-    let users: Vec<UserModel> = sqlx::query_as!(UserModel, "SELECT * FROM users")
+) -> Result<impl IntoResponse, AppError> {
+    let users: Vec<UserResponse> = sqlx::query_as!(UserResponse, "SELECT username,email,id,created_at,updated_at FROM users")
         .fetch_all(&data.db)
         .await
-        .map_err(|_| ApiError::InternalServerError)?;
+        .map_err(|_| AppError::InternalServerError)?;
 
-    let response: GeneralResponse = GeneralResponse {
-        status: Status::Success,
-        data: Some(json!(users)),
-    };
-
+    let response = JsendResponse::success(Some(json!({"users" : users})));
     Ok(Json(response))
 }

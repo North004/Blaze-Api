@@ -1,11 +1,11 @@
 use crate::{
     model::{CommentResponse,UserModel},
-    response::{ApiError, AppJson, GeneralResponse, Status},
+    response::{AppError, AppJson, AppPath, JsendResponse},
     schema::CommentSchema, 
     AppState,
 };
 use axum::{
-    extract::{Path, State},
+    extract::State,
     response::IntoResponse,
     Extension, Json,
 };
@@ -15,10 +15,10 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 pub async fn get_comments_handler(
-    Path(postid): Path<String>,
+    AppPath(postid): AppPath<String>,
     State(data): State<Arc<AppState>>,
-) -> Result<impl IntoResponse, ApiError> {
-    let postid = Uuid::parse_str(&postid).map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
+) -> Result<impl IntoResponse, AppError> {
+    let postid = Uuid::parse_str(&postid).map_err(|_| AppError::JsendFail(json!({"post_id" : "not a valid UUID"})))?;
     let comments = sqlx::query_as!(
         CommentResponse,
         "SELECT
@@ -39,24 +39,21 @@ pub async fn get_comments_handler(
     )
     .fetch_all(&data.db)
     .await
-    .map_err(|_| ApiError::InternalServerError)?;
-    let response: GeneralResponse = GeneralResponse {
-        status: Status::Success,
-        data: Some(json!({
-            "comments" : Some(comments)
-        })),
-    };
+    .map_err(|_| AppError::InternalServerError)?;
+    let response =  JsendResponse::success(Some(json!({
+        "comments" : Some(comments)
+    })));
     Ok(Json(response))
 }
 
 pub async fn create_comment_handler(
     State(data): State<Arc<AppState>>,
     Extension(user): Extension<UserModel>,
-    Path(postid): Path<String>,
+    AppPath(postid): AppPath<String>,
     AppJson(comment): AppJson<CommentSchema>,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<impl IntoResponse, AppError> {
     comment.validate()?;
-    let postid = Uuid::parse_str(&postid).map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
+    let postid = Uuid::parse_str(&postid).map_err(|_| AppError::JsendFail(json!({"post_id" : "not a valid UUID"})))?;
     sqlx::query!(
         "INSERT INTO comments (content,user_id,post_id) VALUES ($1,$2,$3)",
         comment.content,
@@ -65,10 +62,7 @@ pub async fn create_comment_handler(
     )
     .execute(&data.db)
     .await
-    .map_err(|_| ApiError::InternalServerError)?;
-    let response: GeneralResponse = GeneralResponse {
-        status: Status::Success,
-        data: None,
-    };
+    .map_err(|_| AppError::InternalServerError)?;
+    let response = JsendResponse::success(None);
     Ok(Json(response))
 }

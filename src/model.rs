@@ -114,3 +114,12 @@ pub struct CommentResponse {
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
 }
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct UserResponse {
+    pub id: Option<Uuid>,
+    pub username: String,
+    pub email: String,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
+}

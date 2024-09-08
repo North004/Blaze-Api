@@ -29,8 +29,8 @@ pub fn validate_password_length(username: &str) -> Result<(), ValidationError> {
     let len = username.len();
     validate_length(
         len,
-        1,
-        20,
+        8,
+        40,
         "password too short",
         "password too long",
         "password cannot be empty",
@@ -54,7 +54,7 @@ pub fn validate_content_length(username: &str) -> Result<(), ValidationError> {
     validate_length(
         len,
         1,
-        20,
+        225,
         "content too short",
         "content too long",
         "content cannot be empty",

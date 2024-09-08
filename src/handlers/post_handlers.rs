@@ -1,11 +1,11 @@
 use crate::{
     model::{PostResponse, UserModel},
-    response::{ApiError, AppJson, AppPath, GeneralResponse, Status},
+    response::{AppError, AppJson, AppPath, JsendResponse},
     schema::{CreatePostSchema, LikePostSchema},
     AppState,
 };
 use axum::{
-    extract::{Path, State},
+    extract::State,
     response::IntoResponse,
     Extension, Json,
 };
@@ -17,9 +17,9 @@ use validator::Validate;
 pub async fn get_post(
     State(data): State<Arc<AppState>>,
     AppPath(postid): AppPath<String>,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<impl IntoResponse, AppError> {
     let postid = Uuid::parse_str(&postid)
-        .map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
+        .map_err(|_| AppError::JsendFail(json!({"post_id" : "not a valid UUID"})))?;
     let post :PostResponse = sqlx::query_as!(
         PostResponse,
         "SELECT
@@ -42,42 +42,40 @@ pub async fn get_post(
     )
     .fetch_optional(&data.db)
     .await
-    .map_err(|_| ApiError::InternalServerError)?
-    .ok_or( ApiError::Fail(json!({"post" : "post doesnt exist"})))?;
-    let response: GeneralResponse = GeneralResponse {
-        status: Status::Success,
-        data: Some(json!({
-            "post": post
-        })),
-    };
+    .map_err(|_| AppError::InternalServerError)?
+    .ok_or( AppError::JsendFail(json!({"post" : "post doesnt exist"})))?;
+    let response = JsendResponse::success(Some(json!({
+        "post": post
+    })));
     Ok(Json(response))
 }
 
 pub async fn delete_post(
     Extension(user): Extension<UserModel>,
     State(data): State<Arc<AppState>>,
-    Path(postid): Path<String>,
-) -> Result<impl IntoResponse, ApiError> {
+    AppPath(postid): AppPath<String>,
+) -> Result<impl IntoResponse, AppError> {
     let post_id = Uuid::parse_str(&postid)
-        .map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
+        .map_err(|_| AppError::JsendFail(json!({"post_id" : "not a valid UUID"})))?;
     let post_uuid = sqlx::query_scalar!("SELECT user_id FROM posts WHERE id = $1", post_id)
-        .fetch_one(&data.db)
+        .fetch_optional(&data.db)
         .await
-        .map_err(|_| ApiError::InternalServerError)?;
+        .map_err(|_| AppError::InternalServerError)?;
+    
+    let post_uuid =  match post_uuid {
+        Some(val) => val,
+        None => return Err(AppError::JsendFail(json!({"data" : { "post" : "post does not exist"}}))),
+    };
+    
     if user.id != Some(post_uuid) {
-        return Err(ApiError::FailMsg(
-            "not authorized to delete post".to_string(),
-        ));
+        return Err(AppError::JsendFail(json!({"authorization" : "user not authorized to delete this"})));
     }
     sqlx::query!("DELETE FROM posts WHERE id = $1", post_id)
         .execute(&data.db)
         .await
-        .map_err(|_| ApiError::InternalServerError)?;
+        .map_err(|_| AppError::InternalServerError)?;
 
-    let response: GeneralResponse = GeneralResponse {
-        status: Status::Success,
-        data: None,
-    };
+    let response = JsendResponse::success(None);
 
     Ok(Json(response))
 }
@@ -85,12 +83,12 @@ pub async fn delete_post(
 pub async fn react_to_post(
     State(data): State<Arc<AppState>>,
     Extension(user): Extension<UserModel>,
-    Path(postid): Path<String>,
+    AppPath(postid): AppPath<String>,
     AppJson(is_like): AppJson<LikePostSchema>,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<impl IntoResponse, AppError> {
     is_like.validate()?;
     let post_id = Uuid::parse_str(&postid)
-        .map_err(|_| ApiError::Fail(json!({"post_id" : "not a valid UUID"})))?;
+        .map_err(|_| AppError::JsendFail(json!({"post_id" : "not a valid UUID"})))?;
 
     let existing_reaction = sqlx::query!(
         "SELECT id FROM reactions WHERE post_id = $1 AND user_id = $2",
@@ -99,7 +97,7 @@ pub async fn react_to_post(
     )
     .fetch_optional(&data.db)
     .await
-    .map_err(|_| ApiError::InternalServerError)?;
+    .map_err(|_| AppError::InternalServerError)?;
 
     if let Some(reaction) = existing_reaction {
         // Update the existing reaction
@@ -110,7 +108,7 @@ pub async fn react_to_post(
         )
         .execute(&data.db)
         .await
-        .map_err(|_| ApiError::InternalServerError)?;
+        .map_err(|_| AppError::InternalServerError)?;
     } else {
         // Insert a new reaction
         sqlx::query!(
@@ -121,7 +119,7 @@ pub async fn react_to_post(
         )
         .execute(&data.db)
         .await
-        .map_err(|_| ApiError::InternalServerError)?;
+        .map_err(|_| AppError::InternalServerError)?;
     }
 
     let counts = sqlx::query!(
@@ -134,22 +132,19 @@ pub async fn react_to_post(
     )
     .fetch_one(&data.db)
     .await
-    .map_err(|_| ApiError::InternalServerError)?;
+    .map_err(|_| AppError::InternalServerError)?;
 
-    let response: GeneralResponse = GeneralResponse {
-        status: Status::Success,
-        data: Some(json!({
-                "post_id": post_id,
-                "like_count" : counts.likes,
-                "dislike_count" : counts.dislikes,
-        })),
-    };
+    let response = JsendResponse::success(Some(json!({
+        "post_id": post_id,
+        "like_count" : counts.likes,
+        "dislike_count" : counts.dislikes,
+})));
     Ok(Json(response))
 }
 
 pub async fn get_all_posts(
     State(data): State<Arc<AppState>>,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<impl IntoResponse, AppError> {
     let posts: Vec<PostResponse> = sqlx::query_as!(
         PostResponse,
         "SELECT
@@ -172,13 +167,10 @@ pub async fn get_all_posts(
     )
     .fetch_all(&data.db)
     .await
-    .map_err(|_| ApiError::InternalServerError)?;
-    let response: GeneralResponse = GeneralResponse {
-        status: Status::Success,
-        data: Some(json!({
-            "posts" : posts
-        })),
-    };
+    .map_err(|_| AppError::InternalServerError)?;
+    let response = JsendResponse::success(Some(json!({
+        "posts" : posts
+    })));
     Ok(Json(response))
 }
 
@@ -186,7 +178,7 @@ pub async fn create_post(
     Extension(user): Extension<UserModel>,
     State(data): State<Arc<AppState>>,
     AppJson(post): AppJson<CreatePostSchema>,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<impl IntoResponse, AppError> {
     post.validate()?;
     sqlx::query!(
         "INSERT INTO posts (user_id,title,content) VALUES ($1,$2,$3)",
@@ -196,12 +188,9 @@ pub async fn create_post(
     )
     .execute(&data.db)
     .await
-    .map_err(|_| ApiError::InternalServerError)?;
+    .map_err(|_| AppError::InternalServerError)?;
 
-    let response: GeneralResponse = GeneralResponse {
-        status: Status::Success,
-        data: None,
-    };
+    let response =  JsendResponse::success(None);
 
     Ok(Json(response))
 }

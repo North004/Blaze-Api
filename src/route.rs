@@ -14,7 +14,6 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
-
 async fn handle_invalid_path() -> impl IntoResponse {
     (
         StatusCode::NOT_FOUND,
@@ -37,7 +36,7 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
         )
         .route(
             "/profile/upload",
-            post(profile_handlers::upload_profile_pic)
+            post(profile_handlers::upload_profile_pic),
         );
 
     // Define the unprotected routes

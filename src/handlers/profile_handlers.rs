@@ -4,11 +4,15 @@ use crate::{
     AppState,
 };
 use axum::{
-    extract::{Multipart, State}, response::IntoResponse, Extension, Json
+    extract::{Multipart, State},
+    response::IntoResponse,
+    Extension, Json,
 };
 use serde_json::json;
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::fs;
 
 pub async fn get_profile(
     AppPath(username): AppPath<String>,
@@ -43,7 +47,9 @@ pub async fn get_profile(
     let profile = match profile {
         Some(profile) => profile,
         None => {
-            return Err(AppError::JsendFail(json!({"profile" : "profile not found"})));
+            return Err(AppError::JsendFail(
+                json!({"profile" : "profile not found"}),
+            ));
         }
     };
 
@@ -51,25 +57,61 @@ pub async fn get_profile(
     Ok(Json(response))
 }
 
+pub async fn upload_profile_pic(
+    Extension(user): Extension<UserModel>,
+    State(data): State<Arc<AppState>>,
+    mut multipart: Multipart,
+) -> Result<impl IntoResponse, AppError> {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|_| AppError::InternalServerError)?
+    {
+        let content_type = match field.content_type() {
+            Some(content) => content.to_string(),
+            None => {
+                return Err(AppError::JsendFail(
+                    json!({"content-type" : "invalid content type"}),
+                ))
+            }
+        };
 
-pub async fn upload_profile_pic(Extension(user): Extension<UserModel>,State(data): State<Arc<AppState>>,mut multipart: Multipart, ) -> Result<impl IntoResponse,AppError> {
-    while let Some(field) = multipart.next_field().await.unwrap() {
-        let _name = field.name().unwrap().to_string();
-        let file_name = field.file_name().unwrap().to_string();
-        let _content_type = field.content_type().unwrap().to_string();
-        let bdata = field.bytes().await.unwrap();
+        let file_extension = match content_type.as_str() {
+            "image/png" => "png",
+            "image/jpeg" => "jpg",
+            _ => return Err(AppError::JsendError("Unsupported file type".into())),
+        };
+
+        let bdata = match field.bytes().await {
+            Ok(bdata) => bdata,
+            Err(_) => return Err(AppError::JsendFail(json!({"data" : "invalid file data"}))),
+        };
 
         let uuid_string = match user.id {
             Some(id) => id.to_string(),
-            None => return Err(AppError::InternalServerError)
+            None => return Err(AppError::InternalServerError),
         };
 
-        fs::write(format!("./assets/{}-{}",uuid_string,file_name),bdata).await.map_err(|_| AppError::InternalServerError)?;
-        sqlx::query!("UPDATE profiles SET profile_image = $1 WHERE user_id = $2",file_name,user.id).execute(&data.db)
+        let assets_dir = PathBuf::from("./assets");
+
+        let file_name = format!("{}.{}", uuid_string, file_extension);
+
+        let file_path = assets_dir.join(&file_name);
+
+        let mut file = File::create(file_path).map_err(|_| AppError::JsendError("DATA".into()))?;
+        file.write_all(&bdata)
+            .map_err(|_| AppError::InternalServerError)?;
+
+        sqlx::query!(
+            "UPDATE profiles SET profile_image = $1 WHERE user_id = $2",
+            file_name,
+            user.id
+        )
+        .execute(&data.db)
         .await
         .map_err(|_| AppError::InternalServerError)?;
     }
-    
+
     let response = JsendResponse::success(None);
     Ok(Json(response))
 }

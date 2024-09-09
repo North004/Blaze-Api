@@ -69,11 +69,7 @@ pub async fn upload_profile_pic(
     {
         let content_type = match field.content_type() {
             Some(content) => content.to_string(),
-            None => {
-                return Err(AppError::JsendFail(
-                    json!({"content-type" : "invalid content type"}),
-                ))
-            }
+            None => return Err(AppError::JsendError("invalid content-type".into())),
         };
 
         let file_extension = match content_type.as_str() {
@@ -84,7 +80,7 @@ pub async fn upload_profile_pic(
 
         let bdata = match field.bytes().await {
             Ok(bdata) => bdata,
-            Err(_) => return Err(AppError::JsendFail(json!({"data" : "invalid file data"}))),
+            Err(_) => return Err(AppError::JsendError("data error".into())),
         };
 
         let uuid_string = match user.id {

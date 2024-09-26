@@ -4,10 +4,12 @@ use crate::{
     schema::{LoginUserSchema, RegisterUserSchema},
     AppState,
 };
+
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
 };
+
 use axum::{extract::State, response::IntoResponse, Extension, Json};
 use serde_json::json;
 use std::{collections::HashMap, sync::Arc};
